@@ -101,6 +101,54 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
       await dmChannel.send(
         `You have been moved to your new channel - "${newChannel.name}". Have fun!`
       );
+
+      // Ask the user if they'd like to post a message in the text channel
+      const confirmMessage = await dmChannel.send(
+        `Would you like to notify others in the group text channel that you're in the voice channel "${newChannel.name}"? Reply with "yes" or "no".`
+      );
+
+      const confirmResponse = await dmChannel
+        .awaitMessages({
+          max: 1,
+          time: 30000,
+          errors: ["time"],
+          filter: (msg) => !msg.author.bot,
+        })
+        .catch(() => null);
+
+      if (confirmResponse?.first()?.content.trim().toLowerCase() === "yes") {
+        // Locate a suitable text channel under the same parent category
+        const textChannel = newState.guild.channels.cache
+          .filter(
+            (ch) =>
+              ch.parentId === categoryId &&
+              ch.type === ChannelType.GuildText
+          )
+          .sort((a, b) => a.rawPosition - b.rawPosition) // Prioritize by position
+          .find((ch) =>
+            ["general", "chat", "voice-text"].includes(ch.name.toLowerCase())
+          ) || // Preferred names
+          newState.guild.channels.cache.find(
+            (ch) =>
+              ch.parentId === categoryId &&
+              ch.type === ChannelType.GuildText
+          ); // Fallback to any text channel
+
+        if (textChannel) {
+          await textChannel.send(
+            `Hey everyone! ${
+              newState.member.nickname || user.username
+            } is hanging out in the "${newChannel.name}" voice channel. Feel free to join in!`
+          );
+          await dmChannel.send("Your message has been posted.");
+        } else {
+          await dmChannel.send(
+            "Sorry, I couldn't find a text channel in this group to post the message."
+          );
+        }
+      } else {
+        await dmChannel.send("No problem! Have a great time in the voice channel.");
+      }
     } catch (error) {
       console.error(
         "Error while creating a new channel or moving user:",
