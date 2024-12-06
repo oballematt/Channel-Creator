@@ -21,6 +21,7 @@ client.once("ready", () => {
   console.log("Bot is online!");
 });
 
+
 client.on("voiceStateUpdate", async (oldState, newState) => {
   if (
     channelToJoin.includes(newState.channelId) &&
