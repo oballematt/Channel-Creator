@@ -102,7 +102,6 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
         `You have been moved to your new channel - "${newChannel.name}". Have fun!`
       );
 
-      // Ask the user if they'd like to post a message in the text channel
       const confirmMessage = await dmChannel.send(
         `Would you like to notify others in the group text channel that you're in the voice channel "${newChannel.name}"? Reply with "yes" or "no".`
       );
@@ -117,22 +116,21 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
         .catch(() => null);
 
       if (confirmResponse?.first()?.content.trim().toLowerCase() === "yes") {
-        // Locate a suitable text channel under the same parent category
         const textChannel = newState.guild.channels.cache
           .filter(
             (ch) =>
               ch.parentId === categoryId &&
               ch.type === ChannelType.GuildText
           )
-          .sort((a, b) => a.rawPosition - b.rawPosition) // Prioritize by position
+          .sort((a, b) => a.rawPosition - b.rawPosition) 
           .find((ch) =>
-            ["general", "chat", "voice-text"].includes(ch.name.toLowerCase())
-          ) || // Preferred names
+            ["general", "chat", "voice-text", "GENERAL", "PLANNING", "LUNARI-FORTE"].includes(ch.name)
+          ) ||
           newState.guild.channels.cache.find(
             (ch) =>
               ch.parentId === categoryId &&
               ch.type === ChannelType.GuildText
-          ); // Fallback to any text channel
+          );
 
         if (textChannel) {
           await textChannel.send(
