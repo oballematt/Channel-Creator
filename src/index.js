@@ -13,6 +13,7 @@ const client = new Client({
 
 const token = process.env.TOKEN;
 const channelToJoin = process.env.CHANNEL_ID.split(",").map((id) => id.trim());
+const textChannelIds = process.env.TEXT_CHANNEL_ID.split(",").map((id) => id.trim());
 
 const dynamicChannels = new Set();
 
@@ -50,13 +51,7 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
           errors: ["time"],
           filter: (msg) => !msg.author.bot,
         })
-        .catch((error) => {
-          console.error(
-            "Error collecting messages or timeout occurred:",
-            error
-          );
-          return null;
-        });
+        .catch(() => null);
 
       if (!collectedMessages) {
         await dmChannel.send("You didn't respond in time. Please try again.");
@@ -81,59 +76,50 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
       channelName = channelName.replace(/[^a-zA-Z0-9 _-]/g, "").trim();
 
       console.log(
-        `${newState.member.nickname} named the channel: ${channelName}`
+        `${newState.member.nickname || user.username} named the channel: ${channelName}`
       );
 
-      const categoryId = newState.channel.parentId;
       const newChannel = await newState.guild.channels.create({
         name: channelName,
         type: ChannelType.GuildVoice,
-        parent: categoryId,
+        parent: parentCategoryId,
         reason: "Auto-created new channel when user joined",
       });
 
       dynamicChannels.add(newChannel.id);
 
       await newState.member.voice.setChannel(newChannel);
-      console.log(
-        `Moved ${newState.member.nickname} to the new voice channel ${newChannel.name}`
-      );
       await dmChannel.send(
         `You have been moved to your new channel - "${newChannel.name}". Have fun!`
       );
 
       const confirmMessage = await dmChannel.send(
         `Would you like to notify others that you're in the voice channel "${newChannel.name}"? Reply with "yes" or "no".`
-      )
+      );
 
       const confirmResponse = await dmChannel
         .awaitMessages({
           max: 1,
           time: 30000,
           errors: ["time"],
-          filter: (msg) => !msg.author.bot,
+          filter: (msg) =>
+            !msg.author.bot &&
+            ["yes", "no"].includes(msg.content.trim().toLowerCase()),
         })
         .catch(() => null);
 
       if (confirmResponse?.first()?.content.trim().toLowerCase() === "yes") {
-        const textChannel = newState.guild.channels.cache
-          .filter(
-            (ch) =>
-              ch.parentId === categoryId &&
-              ch.type === ChannelType.GuildText
-          )
-          .sort((a, b) => a.rawPosition - b.rawPosition) 
-          .find((ch) =>
-            ["general", "chat", "voice-text", "GENERAL", "PLANNING", "LUNARI-FORTE"].includes(ch.name)
-          ) ||
-          newState.guild.channels.cache.find(
-            (ch) =>
-              ch.parentId === categoryId &&
-              ch.type === ChannelType.GuildText
+        const matchingTextChannel = textChannelIds
+          .map((id) => newState.guild.channels.cache.get(id))
+          .find(
+            (channel) =>
+              channel &&
+              channel.type === ChannelType.GuildText &&
+              channel.parentId === parentCategoryId
           );
 
-        if (textChannel) {
-          await textChannel.send(
+        if (matchingTextChannel) {
+          await matchingTextChannel.send(
             `Hey everyone! ${
               newState.member.nickname || user.username
             } is hanging out in the "${newChannel.name}" voice channel. Feel free to join in!`
@@ -141,7 +127,7 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
           await dmChannel.send("Your message has been posted.");
         } else {
           await dmChannel.send(
-            "Sorry, I couldn't find a text channel in this group to post the message."
+            "Sorry, I couldn't find a matching text channel for this group."
           );
         }
       } else {
@@ -172,8 +158,6 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
           console.error("Error while deleting the channel:", error);
         }
       }
-    } else {
-      console.log(`Channel with ID ${oldState.channelId} not found.`);
     }
   }
 });
