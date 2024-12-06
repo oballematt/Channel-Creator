@@ -103,8 +103,8 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
       );
 
       const confirmMessage = await dmChannel.send(
-        `Would you like to notify others in the group text channel that you're in the voice channel "${newChannel.name}"? Reply with "yes" or "no".`
-      );
+        `Would you like to notify others that you're in the voice channel "${newChannel.name}"? Reply with "yes" or "no".`
+      )
 
       const confirmResponse = await dmChannel
         .awaitMessages({
